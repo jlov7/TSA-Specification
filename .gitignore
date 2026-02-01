@@ -1,0 +1,51 @@
+.DS_Store
+.specstory/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Virtual environments
+.venv/
+venv/
+.python-version
+
+# Test/coverage caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+.cache/
+htmlcov/
+.mutmut-cache/
+mutants/
+
+# Build artifacts
+build/
+dist/
+
+# Generated keys (do not commit real signing keys)
+*_private.pem
+*_public.pem
+
+# Exception: allow test vector keys needed for test suite
+!test-vectors/test-key_private.pem
+!test-vectors/test-key_public.pem
+
+# LaTeX build artifacts and source (only keep final PDF)
+RFC/*.aux
+RFC/*.bbl
+RFC/*.blg
+RFC/*.fdb_latexmk
+RFC/*.fls
+RFC/*.log
+RFC/*.out
+RFC/*.toc
+RFC/*.synctex.gz
+RFC/*.nav
+RFC/*.snm
+RFC/*.vrb
+RFC/*.tex
+RFC/TSA-white-paper.pdf

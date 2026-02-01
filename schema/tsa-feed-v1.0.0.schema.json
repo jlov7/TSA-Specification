@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tsa:feed-schema:1.0.0",
+  "title": "TSA Feed v1.0.0",
+  "description": "Schema for TSA advisory feeds. A feed is a lightweight index of TSA advisories with canonical hashes and URIs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["feed_version", "generated", "publisher", "advisories"],
+  "properties": {
+    "feed_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "generated": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "namespace"],
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string", "format": "uri" },
+        "contact": { "type": "string" }
+      }
+    },
+    "advisories": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/feed_entry" }
+    },
+    "signature": {
+      "description": "Optional signature over the canonicalized feed document (with this field removed).",
+      "$ref": "#/$defs/signature"
+    }
+  },
+  "$defs": {
+    "feed_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "uri", "canonical_hash"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^TSA-(TEST-)?[0-9]{4}-[0-9]{4,}$"
+        },
+        "uri": {
+          "type": "string",
+          "description": "Location of the TSA JSON document. May be an https:// URL, file path, or relative path resolved against the feed document location."
+        },
+        "canonical_hash": {
+          "type": "string",
+          "pattern": "^sha256:[a-fA-F0-9]{64}$"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]
+        },
+        "modified": { "type": "string", "format": "date-time" },
+        "title": { "type": "string" },
+        "cve": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Optional list of CVE identifiers referenced by this advisory."
+        },
+        "advisory": {
+          "type": "object",
+          "description": "Optional inline TSA advisory payload (not fully validated in this feed schema)."
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "type": "string",
+          "enum": ["Ed25519", "ES256", "ES384", "RS256"]
+        },
+        "key_id": { "type": "string" },
+        "value": { "type": "string", "pattern": "^[A-Za-z0-9+/=]+$" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

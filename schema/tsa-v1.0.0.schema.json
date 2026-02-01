@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:tsa:schema:1.0.0",
+  "title": "Tool Security Advisory (TSA) v1.0.0",
+  "description": "Schema for MCP Tool Security Advisories - machine-readable security vulnerability and revocation information for Model Context Protocol tools",
+  "type": "object",
+  "required": ["tsa_version", "id", "published", "modified", "publisher", "title", "affected", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "tsa_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "TSA specification version (semver)"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^TSA-(TEST-)?[0-9]{4}-[0-9]{4,}$",
+      "description": "Unique advisory identifier (TSA-YYYY-NNNN or TSA-TEST-NNNN)"
+    },
+    "published": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Initial publication timestamp (ISO 8601)"
+    },
+    "modified": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last modification timestamp (ISO 8601)"
+    },
+    "withdrawn": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Withdrawal timestamp if advisory is retracted"
+    },
+    "publisher": { "$ref": "#/$defs/publisher" },
+    "title": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 256,
+      "description": "Human-readable advisory title"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed description of the vulnerability"
+    },
+    "severity": { "$ref": "#/$defs/severity" },
+    "related_vulnerabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/related_vulnerability" },
+      "description": "Related CVEs when bundling multiple vulnerabilities"
+    },
+    "affected": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/affected_entry" },
+      "description": "List of affected tools and version ranges"
+    },
+    "references": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reference" },
+      "description": "External references (CVE, GHSA, articles, fixes)"
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/action" },
+      "description": "Recommended actions for registries and hosts"
+    },
+    "workarounds": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/workaround" }
+    },
+    "credits": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/credit" }
+    },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "publisher": {
+      "type": "object",
+      "required": ["name", "namespace"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "namespace": { "type": "string", "format": "uri" },
+        "contact": { "type": "string" },
+        "issuing_authority": { "type": "boolean" }
+      }
+    },
+    "severity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cvss_v4": { "$ref": "#/$defs/cvss_v4_score" },
+        "cvss_v3": { "$ref": "#/$defs/cvss_v3_score" },
+        "qualitative": {
+          "type": "string",
+          "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"]
+        }
+      }
+    },
+    "cvss_score": {
+      "type": "object",
+      "required": ["vector"],
+      "additionalProperties": false,
+      "properties": {
+        "vector": { 
+          "type": "string",
+          "description": "CVSS vector string (v3.x or v4.0 format)"
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "cvss_v3_score": {
+      "type": "object",
+      "required": ["vector"],
+      "additionalProperties": false,
+      "properties": {
+        "vector": { 
+          "type": "string",
+          "pattern": "^CVSS:3\\.[01]/AV:[NALP]/AC:[LH]/PR:[NLH]/UI:[NR]/S:[UC]/C:[NLH]/I:[NLH]/A:[NLH]",
+          "description": "CVSS v3.0 or v3.1 vector string"
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "cvss_v4_score": {
+      "type": "object",
+      "required": ["vector"],
+      "additionalProperties": false,
+      "properties": {
+        "vector": { 
+          "type": "string",
+          "pattern": "^CVSS:4\\.0/AV:[NALP]/AC:[LH]/AT:[NP]/PR:[NLH]/UI:[NPA]/VC:[NLH]/VI:[NLH]/VA:[NLH]/SC:[NLH]/SI:[NLH]/SA:[NLH]",
+          "description": "CVSS v4.0 vector string"
+        },
+        "score": { "type": "number", "minimum": 0, "maximum": 10 }
+      }
+    },
+    "related_vulnerability": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "description": { "type": "string" },
+        "cvss_v4": { "$ref": "#/$defs/cvss_v4_score" },
+        "cvss_v3": { "$ref": "#/$defs/cvss_v3_score" }
+      }
+    },
+    "affected_entry": {
+      "type": "object",
+      "required": ["tool", "status"],
+      "additionalProperties": false,
+      "properties": {
+        "tool": { "$ref": "#/$defs/tool_identifier" },
+        "versions": { "$ref": "#/$defs/version_range" },
+        "status": {
+          "type": "string",
+          "enum": ["AFFECTED", "FIXED", "UNDER_INVESTIGATION", "NOT_AFFECTED"]
+        },
+        "impact_statement": { "type": "string" },
+        "capabilities_abused": { "type": "array", "items": { "type": "string" } },
+        "semantic_drift": { "$ref": "#/$defs/semantic_drift" },
+        "attack_context": { "$ref": "#/$defs/attack_context" },
+        "tbom_binding": { "$ref": "#/$defs/tbom_binding" }
+      }
+    },
+    "tool_identifier": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "registry": { "type": "string" },
+        "purl": { "type": "string" }
+      }
+    },
+    "version_range": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "introduced": { "type": "string" },
+        "fixed": { "type": "string" },
+        "affected_range": { "type": "string" },
+        "last_affected": { "type": "string" }
+      }
+    },
+    "semantic_drift": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "detected": { "type": "boolean" },
+        "description_changed": { "type": "boolean" },
+        "capabilities_changed": { "type": "boolean" },
+        "behavior_changed": { "type": "boolean" },
+        "details": { "type": "string" }
+      }
+    },
+    "attack_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "requires_agent_execution": { "type": "boolean" },
+        "requires_user_interaction": { "type": "boolean" },
+        "requires_network_access": { "type": "boolean" },
+        "requires_local_access": { "type": "boolean" },
+        "requires_elevated_privileges": { "type": "boolean" },
+        "requires_specific_configuration": { "type": "string" },
+        "attack_complexity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
+        "prerequisites": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "tbom_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "content_hash": { 
+          "type": "string",
+          "pattern": "^sha256:[a-fA-F0-9]{64}$",
+          "description": "SHA-256 hash of TBOM content for affected version"
+        },
+        "signature_key_id": { "type": "string" }
+      }
+    },
+    "reference": {
+      "type": "object",
+      "required": ["type", "url"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["CVE", "ADVISORY", "ARTICLE", "FIX", "REPORT", "WEB", "OTHER"] },
+        "id": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "description": { "type": "string" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type", "urgency"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["BLOCK", "WARN", "UPDATE", "INVESTIGATE", "REVOKE"] },
+        "scope": { "type": "string", "enum": ["REGISTRY", "HOST", "GATEWAY", "ALL"] },
+        "condition": { "type": "string" },
+        "urgency": { "type": "string", "enum": ["IMMEDIATE", "HIGH", "MEDIUM", "LOW"] },
+        "target_version": { "type": "string" },
+        "revoked_key_id": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "workaround": {
+      "type": "object",
+      "required": ["description", "effectiveness"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "type": "string" },
+        "effectiveness": { "type": "string", "enum": ["FULL", "PARTIAL", "MINIMAL"] },
+        "instructions": { "type": "string" }
+      }
+    },
+    "credit": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "organization": { "type": "string" },
+        "type": { "type": "string", "enum": ["FINDER", "REPORTER", "ANALYST", "COORDINATOR", "REMEDIATION_DEVELOPER", "OTHER"] },
+        "contact": { "type": "string" }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": { "type": "string", "enum": ["Ed25519", "ES256", "ES384", "RS256"] },
+        "key_id": { "type": "string" },
+        "value": { "type": "string", "pattern": "^[A-Za-z0-9+/=]+$" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

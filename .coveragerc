@@ -1,0 +1,10 @@
+[run]
+source = tools
+omit =
+    tests/*
+    mutants/*
+    .venv/*
+    scripts/*
+
+[report]
+show_missing = True

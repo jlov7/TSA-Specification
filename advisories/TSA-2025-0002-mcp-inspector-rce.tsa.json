@@ -1,0 +1,110 @@
+{
+  "tsa_version": "1.0.0",
+  "id": "TSA-2025-0002",
+  "published": "2025-07-09T00:00:00Z",
+  "modified": "2025-07-10T12:00:00Z",
+  "publisher": {
+    "name": "MCP Security Working Group",
+    "namespace": "https://tsa.mcp.security"
+  },
+  "title": "MCP Inspector Remote Code Execution via 0.0.0.0 Binding",
+  "description": "The @modelcontextprotocol/inspector package before version 0.14.1 binds its development server to 0.0.0.0 by default, exposing it to all network interfaces. This allows attackers on the local network (or via DNS rebinding) to achieve remote code execution through the inspector's debugging capabilities. This is a '0.0.0.0 day' class vulnerability that affects development tools binding to all interfaces. Discovered by Avi Lumelsky of Oligo Security.",
+  "severity": {
+    "cvss_v4": {
+      "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:P/VC:H/VI:H/VA:H/SC:H/SI:H/SA:H",
+      "score": 9.4
+    },
+    "qualitative": "CRITICAL"
+  },
+  "affected": [
+    {
+      "tool": {
+        "name": "@modelcontextprotocol/inspector",
+        "registry": "npm",
+        "purl": "pkg:npm/%40modelcontextprotocol/inspector"
+      },
+      "versions": {
+        "fixed": "0.14.1",
+        "affected_range": "<0.14.1"
+      },
+      "status": "AFFECTED",
+      "impact_statement": "Remote code execution via network-accessible debugging interface. Attackers on local network or using DNS rebinding can execute arbitrary code.",
+      "capabilities_abused": ["network:bind", "debug:eval"],
+      "attack_context": {
+        "requires_agent_execution": false,
+        "requires_user_interaction": true,
+        "requires_network_access": true,
+        "requires_local_access": false,
+        "attack_complexity": "LOW",
+        "prerequisites": [
+          "MCP Inspector running with default settings",
+          "Attacker on same network OR able to perform DNS rebinding"
+        ]
+      }
+    }
+  ],
+  "references": [
+    {
+      "type": "CVE",
+      "id": "CVE-2025-49596",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-49596"
+    },
+    {
+      "type": "ADVISORY",
+      "id": "GHSA-7f8r-222p-6f5g",
+      "url": "https://github.com/advisories/GHSA-7f8r-222p-6f5g"
+    },
+    {
+      "type": "REPORT",
+      "url": "https://www.oligo.security/blog/0-0-0-0-day-exploiting-localhost-apis",
+      "description": "Oligo Security research on 0.0.0.0 day vulnerabilities"
+    },
+    {
+      "type": "FIX",
+      "url": "https://www.npmjs.com/package/@modelcontextprotocol/inspector/v/0.14.1",
+      "description": "Fixed version on npm"
+    }
+  ],
+  "actions": [
+    {
+      "type": "BLOCK",
+      "scope": "REGISTRY",
+      "condition": "<0.14.1",
+      "urgency": "IMMEDIATE",
+      "message": "BLOCKED: Critical RCE vulnerability (CVE-2025-49596). Update to >=0.14.1."
+    },
+    {
+      "type": "WARN",
+      "scope": "HOST",
+      "condition": "<0.14.1",
+      "urgency": "IMMEDIATE",
+      "message": "WARNING: MCP Inspector is binding to 0.0.0.0, exposing debugging interface to network."
+    },
+    {
+      "type": "UPDATE",
+      "scope": "ALL",
+      "urgency": "IMMEDIATE",
+      "target_version": "0.14.1",
+      "message": "Update to version 0.14.1 or later which binds to 127.0.0.1 by default."
+    }
+  ],
+  "workarounds": [
+    {
+      "description": "Run MCP Inspector behind a firewall or in an isolated network environment.",
+      "effectiveness": "PARTIAL",
+      "instructions": "Block external access to the inspector port. Better: update to 0.14.1."
+    },
+    {
+      "description": "Manually specify --host 127.0.0.1 when starting the inspector.",
+      "effectiveness": "FULL",
+      "instructions": "npx @modelcontextprotocol/inspector --host 127.0.0.1"
+    }
+  ],
+  "credits": [
+    {
+      "name": "Avi Lumelsky",
+      "organization": "Oligo Security",
+      "type": "FINDER"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+Tool Security Advisory (TSA) Specification
+Copyright 2025 MCP Security Working Group
+
+NOTICE AND DISCLAIMER
+=====================
+
+This specification and reference implementation are provided as an independent
+community contribution to the Model Context Protocol (MCP) ecosystem security.
+
+IMPORTANT DISCLAIMERS:
+
+1. INDEPENDENT WORK: This specification is an independent community effort.
+   It is NOT officially endorsed by, affiliated with, or maintained by
+   Anthropic, the Model Context Protocol project, or any major technology
+   provider unless explicitly stated otherwise.
+
+2. NO WARRANTY: This specification and all accompanying tools are provided
+   "AS IS" without warranty of any kind. The authors make no guarantees
+   regarding the accuracy, completeness, or fitness for any particular
+   purpose.
+
+3. ADVISORY DATA: The sample advisories included in this package reference
+   real CVEs verified against the National Vulnerability Database (NVD)
+   and GitHub Security Advisories (GHSA). However, users should always
+   verify vulnerability information against authoritative sources before
+   making security decisions.
+
+4. NOT LEGAL ADVICE: This specification does not constitute legal, security,
+   or compliance advice. Organizations should consult appropriate experts
+   before implementing security controls based on this specification.
+
+5. EVOLVING STANDARD: This is version 1.0.0 of an evolving specification.
+   Future versions may introduce breaking changes.
+
+ATTRIBUTION
+===========
+
+This work builds upon and references the following standards and projects:
+
+- JSON Schema (https://json-schema.org/) - Draft 2020-12
+- OSV Schema (https://ossf.github.io/osv-schema/) - Open Source Vulnerability format
+- CVSS (https://www.first.org/cvss/) - Common Vulnerability Scoring System
+- RFC 8785 - JSON Canonicalization Scheme (JCS)
+- Model Context Protocol (https://modelcontextprotocol.io/)
+
+CVE DATA SOURCES
+================
+
+Advisory data verified against:
+- National Vulnerability Database (NVD): https://nvd.nist.gov/
+- GitHub Security Advisories (GHSA): https://github.com/advisories
+
+CONTACT
+=======
+
+For questions, contributions, or security concerns regarding this
+specification, please open an issue on the project repository.

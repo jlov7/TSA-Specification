@@ -1,0 +1,7 @@
+# TSA Specification - Development Dependencies
+# Install with: python3 -m pip install -r requirements-dev.txt
+
+ruff>=0.6.0
+coverage>=7.6.0
+mutmut>=2.5.0
+pytest>=8.0.0

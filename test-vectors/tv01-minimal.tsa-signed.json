@@ -1,0 +1,33 @@
+{
+  "tsa_version": "1.0.0",
+  "id": "TSA-TEST-2025-0001",
+  "published": "2025-01-15T12:00:00Z",
+  "modified": "2025-01-15T12:00:00Z",
+  "publisher": {
+    "name": "Test Publisher",
+    "namespace": "https://test.example.com"
+  },
+  "title": "Minimal Valid TSA Document for Testing",
+  "affected": [
+    {
+      "tool": {
+        "name": "test-tool",
+        "registry": "npm"
+      },
+      "status": "AFFECTED"
+    }
+  ],
+  "actions": [
+    {
+      "type": "WARN",
+      "urgency": "LOW",
+      "message": "This is a test advisory"
+    }
+  ],
+  "signature": {
+    "algorithm": "Ed25519",
+    "key_id": "test:key1",
+    "value": "Qy+DepC0d55c9jggEasmCeDi1f7syd1y+I+oYh8LJLyyWJR6h1+Juw9ohVqO3DeaHNfdyymtPGeriGVOtb31Cg==",
+    "timestamp": "2026-01-26T21:52:27.491017Z"
+  }
+}

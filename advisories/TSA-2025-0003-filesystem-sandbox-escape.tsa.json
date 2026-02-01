@@ -1,0 +1,124 @@
+{
+  "tsa_version": "1.0.0",
+  "id": "TSA-2025-0003",
+  "published": "2025-07-09T00:00:00Z",
+  "modified": "2025-07-11T09:00:00Z",
+  "publisher": {
+    "name": "MCP Security Working Group",
+    "namespace": "https://tsa.mcp.security"
+  },
+  "title": "MCP Filesystem Server Sandbox Escape via Path Traversal and Symlink Following",
+  "description": "The @modelcontextprotocol/server-filesystem package before version 0.6.4 contains two related vulnerabilities that allow escaping the configured filesystem sandbox. CVE-2025-53109 is a path traversal vulnerability in the edit_file function allowing writes outside allowed directories. CVE-2025-53110 allows symlink-following to read files outside the sandbox. Together these enable full filesystem access regardless of configured restrictions.",
+  "severity": {
+    "cvss_v4": {
+      "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:N/SC:N/SI:N/SA:N",
+      "score": 8.4
+    },
+    "qualitative": "HIGH"
+  },
+  "related_vulnerabilities": [
+    {
+      "id": "CVE-2025-53109",
+      "description": "Path traversal in edit_file allows writing outside sandbox",
+      "cvss_v4": {
+        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:N/VI:H/VA:N/SC:N/SI:N/SA:N"
+      }
+    },
+    {
+      "id": "CVE-2025-53110",
+      "description": "Symlink following allows reading files outside sandbox",
+      "cvss_v4": {
+        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:N/VA:N/SC:N/SI:N/SA:N"
+      }
+    }
+  ],
+  "affected": [
+    {
+      "tool": {
+        "name": "@modelcontextprotocol/server-filesystem",
+        "registry": "npm",
+        "purl": "pkg:npm/%40modelcontextprotocol/server-filesystem"
+      },
+      "versions": {
+        "fixed": "0.6.4",
+        "affected_range": "<0.6.4"
+      },
+      "status": "AFFECTED",
+      "impact_statement": "Complete bypass of filesystem sandbox. Attackers can read and write arbitrary files on the host system.",
+      "capabilities_abused": ["filesystem:read", "filesystem:write"],
+      "attack_context": {
+        "requires_agent_execution": true,
+        "requires_user_interaction": false,
+        "requires_network_access": false,
+        "attack_complexity": "LOW",
+        "prerequisites": [
+          "MCP filesystem server running with any configuration",
+          "Ability to send MCP tool calls (e.g., via malicious prompt injection)"
+        ]
+      }
+    }
+  ],
+  "references": [
+    {
+      "type": "CVE",
+      "id": "CVE-2025-53109",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-53109"
+    },
+    {
+      "type": "CVE",
+      "id": "CVE-2025-53110",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-53110"
+    },
+    {
+      "type": "FIX",
+      "url": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem/v/0.6.4",
+      "description": "Fixed version on npm"
+    },
+    {
+      "type": "WEB",
+      "url": "https://github.com/modelcontextprotocol/servers",
+      "description": "MCP Servers repository"
+    }
+  ],
+  "actions": [
+    {
+      "type": "BLOCK",
+      "scope": "REGISTRY",
+      "condition": "<0.6.4",
+      "urgency": "IMMEDIATE",
+      "message": "BLOCKED: Filesystem sandbox escape (CVE-2025-53109, CVE-2025-53110). Update to >=0.6.4."
+    },
+    {
+      "type": "WARN",
+      "scope": "HOST",
+      "condition": "<0.6.4",
+      "urgency": "HIGH",
+      "message": "WARNING: Filesystem server sandbox can be bypassed. Sensitive files may be exposed."
+    },
+    {
+      "type": "UPDATE",
+      "scope": "ALL",
+      "urgency": "IMMEDIATE",
+      "target_version": "0.6.4",
+      "message": "Update to version 0.6.4 or later to fix sandbox escape vulnerabilities."
+    }
+  ],
+  "workarounds": [
+    {
+      "description": "Run the filesystem server in a container with minimal filesystem access.",
+      "effectiveness": "PARTIAL",
+      "instructions": "Use Docker/Podman with read-only mounts for sensitive directories."
+    },
+    {
+      "description": "Disable the filesystem MCP server until updated.",
+      "effectiveness": "FULL",
+      "instructions": "Remove server-filesystem from MCP configuration until update is applied."
+    }
+  ],
+  "credits": [
+    {
+      "name": "Model Context Protocol Security Team",
+      "type": "FINDER"
+    }
+  ]
+}

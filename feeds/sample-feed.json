@@ -1,0 +1,44 @@
+{
+  "feed_version": "1.0.0",
+  "generated": "2026-01-26T16:45:31.444861Z",
+  "publisher": {
+    "name": "MCP Security Working Group",
+    "namespace": "https://github.com/mcp-security"
+  },
+  "advisories": [
+    {
+      "id": "TSA-2025-0003",
+      "uri": "TSA-2025-0003-filesystem-sandbox-escape.tsa.json",
+      "canonical_hash": "sha256:c684f4d7db8f3f2ab390765d44d19c1d65e80d3ac1ca8056c9f3e531cd5dbd37",
+      "title": "MCP Filesystem Server Sandbox Escape via Path Traversal and Symlink Following",
+      "modified": "2025-07-11T09:00:00Z",
+      "severity": "HIGH",
+      "cve": [
+        "CVE-2025-53109",
+        "CVE-2025-53110"
+      ]
+    },
+    {
+      "id": "TSA-2025-0002",
+      "uri": "TSA-2025-0002-mcp-inspector-rce.tsa.json",
+      "canonical_hash": "sha256:1597e94df0cd817425099230b955a250f1281a4404aad026c2135a90641dac15",
+      "title": "MCP Inspector Remote Code Execution via 0.0.0.0 Binding",
+      "modified": "2025-07-10T12:00:00Z",
+      "severity": "CRITICAL",
+      "cve": [
+        "CVE-2025-49596"
+      ]
+    },
+    {
+      "id": "TSA-2025-0001",
+      "uri": "TSA-2025-0001-mcp-remote-rce.tsa.json",
+      "canonical_hash": "sha256:bd97ea5687443c2ebe5cb007924819012b504d51112d399984fd3eb2043242dc",
+      "title": "mcp-remote OS Command Injection via OAuth Callback URL",
+      "modified": "2025-07-09T18:00:00Z",
+      "severity": "CRITICAL",
+      "cve": [
+        "CVE-2025-6514"
+      ]
+    }
+  ]
+}

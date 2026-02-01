@@ -1,0 +1,12 @@
+# TSA Specification - Python Dependencies (Python 3.10+)
+# Install with: pip install -r requirements.txt
+
+# Required for JSON Schema validation (Draft 2020-12)
+jsonschema>=4.17.0
+
+# Required for Ed25519 signing and verification
+cryptography>=41.0.0
+
+# Optional: For format validation in jsonschema
+rfc3339-validator>=0.1.4
+rfc3986-validator>=0.1.1

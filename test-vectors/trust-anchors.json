@@ -1,0 +1,26 @@
+{
+  "trust_anchors_version": "1.0.0",
+  "description": "Trusted signing keys for TSA advisory verification",
+  "updated": "2025-01-16T00:00:00Z",
+  "anchors": [
+    {
+      "key_id": "mcp-security-wg:prod-2025",
+      "publisher": "MCP Security Working Group",
+      "trust_level": "full",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAVe1fxE8ORKwf7gzNp5k0mVw5sRRNHZKRDh1r2CUvHZU=\n-----END PUBLIC KEY-----",
+      "notes": "Production signing key for official MCP Security advisories",
+      "valid_from": "2025-01-01T00:00:00Z",
+      "valid_until": "2026-12-31T23:59:59Z"
+    },
+    {
+      "key_id": "mcp-security-wg:test-2025",
+      "publisher": "MCP Security Working Group",
+      "trust_level": "warn_only",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEATestKeyForDemonstrationOnlyNotForProductionUse=\n-----END PUBLIC KEY-----",
+      "notes": "Test key for development and demos - WARN only, never BLOCK",
+      "valid_from": "2025-01-01T00:00:00Z",
+      "valid_until": "2025-12-31T23:59:59Z"
+    }
+  ],
+  "revoked_keys": []
+}
