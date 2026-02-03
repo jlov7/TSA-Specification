@@ -3153,6 +3153,45 @@ def test_cli_e2e():
             )
 
 
+def test_root_wrappers():
+    """Ensure top-level wrapper scripts work for docs and the RFC."""
+    log("\n=== Root Wrapper Tests ===")
+
+    if MUTANTS_ROOT is not None:
+        test_pass("Root wrappers (skipped under mutmut)")
+        return
+
+    python = sys.executable
+
+    tsactl_wrapper = REPO_ROOT / "tsactl.py"
+    result = subprocess.run(
+        [python, str(tsactl_wrapper), "--version"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    combined = (result.stdout or "") + (result.stderr or "")
+    if result.returncode == 0 and "tsactl 1.0.0" in combined:
+        test_pass("tsactl.py wrapper")
+    else:
+        reason = combined.strip() or f"Exit {result.returncode}"
+        test_fail("tsactl.py wrapper", reason)
+
+    result = subprocess.run(
+        [python, "-c", "from tsa_registry_sdk import TSARegistry"],
+        capture_output=True,
+        text=True,
+        cwd=str(REPO_ROOT),
+    )
+    if result.returncode == 0:
+        test_pass("tsa_registry_sdk import")
+    else:
+        test_fail(
+            "tsa_registry_sdk import",
+            result.stderr.strip() or result.stdout.strip() or f"Exit {result.returncode}",
+        )
+
+
 # =============================================================================
 # CLI Entrypoint (In-Process) Tests
 # =============================================================================
@@ -4912,6 +4951,7 @@ def run_all(verbose: bool = False):
         test_build_feed_fallback()
         test_build_feed_variants()
         test_cli_e2e()
+        test_root_wrappers()
         test_cli_entrypoints_in_process()
         test_registry_sdk()
         test_registry_feed_sync()

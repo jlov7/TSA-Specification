@@ -6,8 +6,8 @@ This guide shows how to integrate TSA (Tool Security Advisory) into your MCP too
 
 ## Why Integrate TSA?
 
-1. **Real vulnerabilities exist** - CVE-2025-6514, CVE-2025-49596, and CVE-2025-53109/53110 are actively exploitable
-2. **Users expect protection** - Modern package registries (npm, PyPI) block known-vulnerable versions
+1. **Examples included** - `advisories/` includes CVE-2025-6514, CVE-2025-49596, and CVE-2025-53109/53110
+2. **Users expect protection** - Modern registries increasingly surface warnings or restrictions for known-vulnerable versions
 3. **Machine-readable format** - No more manually parsing security announcements
 4. **5-line integration** - The SDK handles feed sync, matching, and policy enforcement
 
@@ -18,7 +18,7 @@ This guide shows how to integrate TSA (Tool Security Advisory) into your MCP too
 The TSA Registry SDK provides a complete solution:
 
 ```python
-from tsa_registry_sdk import TSARegistry
+from tools.tsa_registry_sdk import TSARegistry
 
 # Initialize once at startup
 registry = TSARegistry(
@@ -78,10 +78,10 @@ For shell-based workflows:
 
 ```bash
 # Validate advisory
-python3 tsactl.py validate advisory.tsa.json
+python3 tools/tsactl.py validate advisory.tsa.json
 
 # Check inventory (returns exit code 2 if vulnerabilities found)
-python3 tsactl.py match advisory.tsa.json inventory.json
+python3 tools/tsactl.py match advisory.tsa.json inventory.json
 if [ $? -eq 2 ]; then
     echo "Vulnerabilities found!"
 fi
@@ -182,8 +182,8 @@ Monitor these for security posture:
 Use the sample inventory to verify matching:
 
 ```bash
-# Should find 3 vulnerable packages
-python3 tsactl.py match advisories/TSA-2025-0001-mcp-remote-rce.tsa.json test-vectors/sample-inventory.json
+# Should find 1 vulnerable package
+python3 tools/tsactl.py match advisories/TSA-2025-0001-mcp-remote-rce.tsa.json test-vectors/sample-inventory.json
 ```
 
 Expected output:

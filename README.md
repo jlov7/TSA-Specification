@@ -161,6 +161,14 @@ BLOCK downgrades to WARN with a human-readable explanation.
 
 ---
 
+## Project Metadata
+
+- Citation details: `CITATION.cff`
+- Security reporting: `SECURITY.md`
+- Release history: `CHANGELOG.md`
+
+---
+
 ## Quick Start
 
 ### Validate an Advisory
