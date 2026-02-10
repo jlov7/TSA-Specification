@@ -363,7 +363,8 @@ Apache-2.0
 
 Author: MCP Security Working Group
 Specification Version: 1.0.0
-Last Updated: 2026-02-01
+Last Updated: 2026-02-10
+Zenodo DOI: 10.5281/zenodo.18599478
 
 ---
 <sub><em>This project is independent research. Views expressed are the author's own and do not represent those of any employer or affiliated organization.</em></sub>
