@@ -16,9 +16,9 @@ Version: 1.0.0
 License: Apache-2.0
 """
 
+import hashlib
 import re
-import zlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Optional
 
 
@@ -187,7 +187,9 @@ def osv_to_tsa(osv: Dict, tsa_id: Optional[str] = None) -> Dict:
     if osv.get("modified"):
         tsa["modified"] = osv["modified"]
     else:
-        tsa["modified"] = osv.get("published", datetime.utcnow().isoformat() + "Z")
+        tsa["modified"] = osv.get(
+            "published", datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        )
     if osv.get("withdrawn"):
         tsa["withdrawn"] = osv["withdrawn"]
 
@@ -402,7 +404,7 @@ def _is_valid_tsa_id(value: str) -> bool:
 
 
 def _generate_tsa_id(osv_id: str, published: Optional[str]) -> str:
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     if published:
         try:
             year = datetime.fromisoformat(
@@ -412,8 +414,9 @@ def _generate_tsa_id(osv_id: str, published: Optional[str]) -> str:
             pass
     digest = 0
     if osv_id:
-        digest = zlib.crc32(osv_id.encode("utf-8"))  # pragma: no mutate
-    serial = f"{digest % 10000:04d}"
+        digest_hex = hashlib.sha256(osv_id.encode("utf-8")).hexdigest()[:16]  # pragma: no mutate
+        digest = int(digest_hex, 16)
+    serial = f"{digest % (10**12):012d}"
     return f"TSA-TEST-{year}-{serial}"
 
 

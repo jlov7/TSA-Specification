@@ -196,6 +196,7 @@ class TSARegistry:
         trust_anchors_path: Optional[str] = None,
         require_signatures: bool = False,
         cache_dir: Optional[str] = None,
+        allow_insecure_http: bool = False,
     ):
         """
         Initialize the TSA Registry.
@@ -204,11 +205,13 @@ class TSARegistry:
             trust_anchors_path: Path to trust-anchors.json file
             require_signatures: If True, unsigned advisories are ignored for BLOCK actions
             cache_dir: Directory for caching fetched advisories
+            allow_insecure_http: If True, allow plain HTTP feed/advisory fetches
         """
         self.feeds: List[str] = []
         self.advisories: Dict[str, Dict] = {}  # id -> advisory
         self.trust_anchors: Dict[str, TrustAnchor] = {}
         self.require_signatures = require_signatures
+        self.allow_insecure_http = allow_insecure_http
         self.cache_dir = Path(cache_dir) if cache_dir else None
         self.last_sync: Optional[datetime] = None
         self.sync_errors: List[str] = []
@@ -408,23 +411,35 @@ class TSARegistry:
             path = url[7:]
             with open(path, "r") as f:  # pragma: no mutate
                 return json.load(f)
-        elif url.startswith(("http://", "https://")):
-            import urllib.request
-            import ssl
-
-            # Create SSL context that verifies certificates
-            ctx = ssl.create_default_context()
-
-            req = urllib.request.Request(url)
-            req.add_header("User-Agent", "TSA-Registry-SDK/1.0.0")  # pragma: no mutate
-            req.add_header("Accept", "application/json")  # pragma: no mutate
-
-            with urllib.request.urlopen(req, context=ctx, timeout=30) as response:
-                return json.loads(response.read().decode("utf-8"))  # pragma: no mutate
+        elif url.startswith("http://"):
+            if not self.allow_insecure_http:
+                raise ValueError(
+                    "Insecure HTTP URL blocked. Use https:// or set allow_insecure_http=True."
+                )
+            return self._fetch_http_json(url, verify_tls=False)
+        elif url.startswith("https://"):
+            return self._fetch_http_json(url, verify_tls=True)
         else:
             # Assume local path
             with open(url, "r") as f:  # pragma: no mutate
                 return json.load(f)
+
+    def _fetch_http_json(self, url: str, verify_tls: bool) -> Dict:
+        """Fetch JSON from HTTP(S), with TLS verification for HTTPS."""
+        import ssl
+        import urllib.request
+
+        req = urllib.request.Request(url)
+        req.add_header("User-Agent", "TSA-Registry-SDK/1.0.0")  # pragma: no mutate
+        req.add_header("Accept", "application/json")  # pragma: no mutate
+
+        if verify_tls:
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=30) as response:  # nosec B310
+                return json.loads(response.read().decode("utf-8"))  # pragma: no mutate
+
+        with urllib.request.urlopen(req, timeout=30) as response:  # nosec B310
+            return json.loads(response.read().decode("utf-8"))  # pragma: no mutate
 
     def _resolve_url(self, base_url: str, relative_url: str) -> str:
         """Resolve a relative URL against a base URL."""
@@ -493,73 +508,82 @@ class TSARegistry:
         result = CheckResult()
 
         key = f"{name}@{registry}"
-        advisory_ids = self._package_index.get(key, set())
+        advisory_ids = sorted(self._package_index.get(key, set()), key=str)
+        seen_advisory_ids: Set[str] = set()
+        seen_actions: Set[Tuple[str, str, str, str]] = set()
 
         for advisory_id in advisory_ids:
             advisory = self.advisories.get(advisory_id)
             if not advisory:
                 continue
 
-            for affected in advisory.get("affected", []):
+            def _entry_matches(affected: Dict) -> bool:
                 tool = affected.get("tool", {})
                 if tool.get("name") != name:
-                    continue
+                    return False
                 if tool.get("registry") and tool.get("registry") != registry:
-                    continue
+                    return False
+                return self._version_affected(version, affected)
 
-                # Check if this version is affected
-                if not self._version_affected(version, affected):
-                    continue
+            if not any(_entry_matches(affected) for affected in advisory.get("affected", [])):
+                continue
 
+            if advisory_id not in seen_advisory_ids:
                 result.advisories.append(advisory)
+                seen_advisory_ids.add(advisory_id)
 
-                signature = advisory.get("signature")
-                signature_dict = signature if isinstance(signature, dict) else {}
-                signature_present = bool(signature_dict)
-                key_id = signature_dict.get("key_id")
-                anchor = self.trust_anchors.get(key_id) if key_id else None
-                sig_ok = False  # pragma: no mutate
-                sig_reason = ""  # pragma: no mutate
-                if self.require_signatures and anchor:
-                    sig_ok, sig_reason = self._verify_signature(advisory, anchor)
+            signature = advisory.get("signature")
+            signature_dict = signature if isinstance(signature, dict) else {}
+            signature_present = bool(signature_dict)
+            key_id = signature_dict.get("key_id")
+            anchor = self.trust_anchors.get(key_id) if key_id else None
+            sig_ok = False  # pragma: no mutate
+            sig_reason = ""  # pragma: no mutate
+            if self.require_signatures and anchor:
+                sig_ok, sig_reason = self._verify_signature(advisory, anchor)
 
-                # Process actions
-                for action in advisory.get("actions", []):
-                    action_type = action.get("type")
-                    condition = action.get("condition", "")  # pragma: no mutate
+            # Process actions once per advisory for this package/version.
+            for action in advisory.get("actions", []):
+                action_type = action.get("type")
+                condition = action.get("condition", "")  # pragma: no mutate
 
-                    # Check if action condition applies to this version
-                    if condition and not self._matches_condition(version, condition):
-                        continue
+                # Check if action condition applies to this version
+                if condition and not self._matches_condition(version, condition):
+                    continue
 
-                    result.actions.append(action)
-                    message = action.get("message", f"Security issue: {advisory_id}")
+                message = action.get("message", f"Security issue: {advisory_id}")
+                action_key = (advisory_id, action_type or "", condition, message)
+                if action_key in seen_actions:
+                    continue
+                seen_actions.add(action_key)
+                result.actions.append(action)
 
-                    if action_type == "BLOCK":
-                        # Check signature requirements
-                        if self.require_signatures:
-                            if not signature_present:
-                                reason = "unsigned"
-                            elif not key_id:
-                                reason = "missing key_id"
-                            elif not anchor:
-                                reason = "unknown signer"
-                            elif not sig_ok:
-                                reason = sig_reason or "invalid signature"
-                            elif anchor.trust_level != "full":
-                                reason = f"trust_level={anchor.trust_level}"
-                            else:
-                                reason = ""  # pragma: no mutate
+                if action_type == "BLOCK":
+                    # Check signature requirements
+                    if self.require_signatures:
+                        if not signature_present:
+                            reason = "unsigned"
+                        elif not key_id:
+                            reason = "missing key_id"
+                        elif not anchor:
+                            reason = "unknown signer"
+                        elif not sig_ok:
+                            reason = sig_reason or "invalid signature"
+                        elif anchor.trust_level != "full":
+                            reason = f"trust_level={anchor.trust_level}"
+                        else:
+                            reason = ""  # pragma: no mutate
 
-                            if reason:
-                                warning_msg = f"[WARN instead of BLOCK - {reason}] {message}"
-                                result.warnings.append(warning_msg)
-                                continue
+                        if reason:
+                            warning_msg = f"[WARN instead of BLOCK - {reason}] {message}"
+                            result.warnings.append(warning_msg)
+                            continue
 
-                        result.blocked = True
+                    result.blocked = True
+                    if not result.message:
                         result.message = message
-                    elif action_type == "WARN":
-                        result.warnings.append(message)
+                elif action_type == "WARN":
+                    result.warnings.append(message)
 
         return result
 

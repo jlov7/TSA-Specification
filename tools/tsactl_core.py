@@ -261,7 +261,7 @@ def validate_semantics(tsa_doc: Dict) -> Tuple[List[str], List[str]]:
         mod_dt = datetime.fromisoformat(modified.replace("Z", "+00:00"))  # pragma: no mutate
         if mod_dt < pub_dt:
             errors.append("modified timestamp cannot be before published timestamp")
-    except (ValueError, AttributeError):
+    except (ValueError, AttributeError, TypeError):
         pass  # Format errors caught by schema validation
 
     # Check affected entries have meaningful content

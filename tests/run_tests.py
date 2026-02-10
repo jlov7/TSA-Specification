@@ -1550,6 +1550,40 @@ def test_tsactl_semantics_edge_cases():
         test_fail("validate_semantics cvss_v4 ok", f"errors={errors}, warnings={warnings}")
 
 
+def test_tsactl_semantics_mixed_timezone_no_crash():
+    """Ensure semantic validation does not crash on mixed naive/aware timestamps."""
+    log("\n=== tsactl Semantics Robustness Tests ===")
+
+    try:
+        import tools.tsactl_core as tsactl
+    except ImportError as e:
+        test_fail("tsactl semantics robustness import", str(e))
+        return
+
+    mixed_doc = {
+        "tsa_version": "1.0.0",
+        "published": "2025-01-01T00:00:00+00:00",
+        "modified": "2025-01-01T00:00:00",
+        "affected": [
+            {
+                "status": "AFFECTED",
+                "tool": {"name": "demo"},
+                "versions": {"introduced": "1.0.0"},
+            }
+        ],
+        "actions": [{"type": "WARN", "message": "Warn"}],
+        "references": [{"type": "ADVISORY", "url": "https://example.test"}],
+        "severity": {"qualitative": "LOW"},
+    }
+
+    try:
+        _errors, _warnings = tsactl.validate_semantics(mixed_doc)
+    except Exception as e:
+        test_fail("validate_semantics mixed timezone robustness", str(e))
+    else:
+        test_pass("validate_semantics mixed timezone robustness")
+
+
 def test_tsactl_match_bounds():
     """Exercise match_advisory bounds logic."""
     log("\n=== tsactl Match Bounds Tests ===")
@@ -2301,6 +2335,47 @@ def test_osv_converter_edge_cases():
     else:
         test_fail("generate_tsa_id invalid published", "Expected TSA-TEST id")
 
+    collision_a = oc._generate_tsa_id("OSV-DEMO-52", "2025-01-01T00:00:00Z")
+    collision_b = oc._generate_tsa_id("OSV-DEMO-181", "2025-01-01T00:00:00Z")
+    if collision_a != collision_b:
+        test_pass("generate_tsa_id collision resistance")
+    else:
+        test_fail(
+            "generate_tsa_id collision resistance",
+            f"Expected unique IDs, got {collision_a} for both",
+        )
+
+    # Ensure year fallback is timezone-aware UTC.
+    original_datetime = oc._core.datetime
+
+    class _DateTimeProbe:
+        tz_arg = None
+
+        @classmethod
+        def now(cls, tz=None):
+            cls.tz_arg = tz
+            return type("_Now", (), {"year": 2042})()
+
+        @staticmethod
+        def fromisoformat(value):
+            return original_datetime.fromisoformat(value)
+
+    oc._core.datetime = _DateTimeProbe
+    try:
+        generated_tz = oc._generate_tsa_id("OSV-TZ-PROBE", None)
+        if (
+            generated_tz.startswith("TSA-TEST-2042-")
+            and _DateTimeProbe.tz_arg is oc._core.timezone.utc
+        ):
+            test_pass("generate_tsa_id uses UTC fallback year")
+        else:
+            test_fail(
+                "generate_tsa_id uses UTC fallback year",
+                f"id={generated_tz} tz={_DateTimeProbe.tz_arg}",
+            )
+    finally:
+        oc._core.datetime = original_datetime
+
     # CLI stdout branch and __main__
     with tempfile.NamedTemporaryFile(mode="w", delete=False) as tmp:
         tmp.write(json.dumps(tsa_doc))
@@ -2516,7 +2591,7 @@ def test_osv_converter_golden():
 
     expected_tsa = {
         "tsa_version": "1.0.0",
-        "id": "TSA-TEST-2025-0241",
+        "id": oc._generate_tsa_id(osv_doc["id"], osv_doc["published"]),
         "published": "2025-02-01T00:00:00Z",
         "modified": "2025-02-02T00:00:00Z",
         "withdrawn": "2025-02-03T00:00:00Z",
@@ -2951,6 +3026,80 @@ def test_build_feed_variants():
             test_pass("build_feed base_url preserves trailing X")
         else:
             test_fail("build_feed base_url preserves trailing X", "Unexpected base_url trimming")
+
+        (advisory_dir / "missing-id.tsa.json").write_text(
+            json.dumps(
+                {
+                    "tsa_version": "1.0.0",
+                    "title": "Missing id advisory",
+                    "modified": "2025-01-05T00:00:00Z",
+                }
+            )
+        )
+        (advisory_dir / "bad-format-id.tsa.json").write_text(
+            json.dumps(
+                {
+                    "tsa_version": "1.0.0",
+                    "id": "NOT-A-TSA-ID",
+                    "title": "Bad id format",
+                    "modified": "2025-01-05T00:00:00Z",
+                }
+            )
+        )
+        (advisory_dir / "nonstr-id.tsa.json").write_text(
+            json.dumps(
+                {
+                    "tsa_version": "1.0.0",
+                    "id": 12345,
+                    "title": "Non-string id",
+                    "modified": "2025-01-05T00:00:00Z",
+                }
+            )
+        )
+        (advisory_dir / "z-late-valid.tsa.json").write_text(
+            json.dumps(
+                {
+                    "tsa_version": "1.0.0",
+                    "id": "TSA-TEST-2025-0099",
+                    "published": "2025-01-09T00:00:00Z",
+                    "modified": "2025-01-09T00:00:00Z",
+                    "publisher": {"name": "Test", "namespace": "https://example.test"},
+                    "title": "Late valid advisory",
+                    "affected": [
+                        {"tool": {"name": "demo", "registry": "npm"}, "status": "AFFECTED"}
+                    ],
+                    "actions": [{"type": "WARN", "urgency": "LOW", "message": "Test"}],
+                }
+            )
+        )
+        stderr_buf = io.StringIO()
+        stdout_buf = io.StringIO()
+        with contextlib.redirect_stderr(stderr_buf), contextlib.redirect_stdout(stdout_buf):
+            filtered_feed = build_feed(advisory_dir)
+        filtered_ids = [entry.get("id") for entry in filtered_feed.get("advisories", [])]
+        if (
+            all(isinstance(entry_id, str) and entry_id for entry_id in filtered_ids)
+            and "TSA-TEST-2025-0099" in filtered_ids
+        ):
+            test_pass("build_feed skips invalid advisory ids")
+        else:
+            test_fail("build_feed skips invalid advisory ids", f"Found invalid ids: {filtered_ids}")
+
+        stderr_text = stderr_buf.getvalue()
+        stdout_text = stdout_buf.getvalue()
+        if (
+            "missing or invalid advisory id" in stderr_text
+            and "missing-id.tsa.json" in stderr_text
+            and "bad-format-id.tsa.json" in stderr_text
+            and "nonstr-id.tsa.json" in stderr_text
+            and not stdout_text.strip()
+        ):
+            test_pass("build_feed invalid id warnings on stderr")
+        else:
+            test_fail(
+                "build_feed invalid id warnings on stderr",
+                f"stderr={stderr_text!r} stdout={stdout_text!r}",
+            )
 
 
 # =============================================================================
@@ -3525,6 +3674,83 @@ def test_registry_feed_sync_edge_cases():
         test_fail("Registry sync edge imports", str(e))
         return
 
+    import urllib.request
+
+    class DummyResponse:
+        def __init__(self, data: bytes):
+            self._data = data
+
+        def read(self):
+            return self._data
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    original_urlopen = urllib.request.urlopen
+    try:
+        urllib.request.urlopen = lambda *_args, **_kwargs: DummyResponse(
+            json.dumps({"advisories": []}).encode("utf-8")
+        )
+        registry_http = TSARegistry()
+        try:
+            registry_http._fetch_url("http://example.test/feed.json")
+        except ValueError as e:
+            expected = "Insecure HTTP URL blocked. Use https:// or set allow_insecure_http=True."
+            if str(e) == expected:
+                test_pass("Registry rejects insecure http by default")
+            else:
+                test_fail("Registry rejects insecure http by default", f"Wrong exception: {e}")
+        except Exception as e:
+            test_fail("Registry rejects insecure http by default", f"Wrong exception: {e}")
+        else:
+            test_fail(
+                "Registry rejects insecure http by default",
+                "Expected ValueError for http:// URL",
+            )
+
+        try:
+            registry_http_opt_in = TSARegistry(allow_insecure_http=True)
+            http_calls = []
+            registry_http_opt_in._fetch_http_json = lambda url, verify_tls: (
+                http_calls.append((url, verify_tls)) or {"advisories": []}
+            )
+            payload = registry_http_opt_in._fetch_url("http://example.test/feed.json")
+            if payload == {"advisories": []} and http_calls == [
+                ("http://example.test/feed.json", False)
+            ]:
+                test_pass("Registry allow_insecure_http opt-in")
+            else:
+                test_fail(
+                    "Registry allow_insecure_http opt-in",
+                    f"Unexpected payload/calls: payload={payload}, calls={http_calls}",
+                )
+        except Exception as e:
+            test_fail("Registry allow_insecure_http opt-in", str(e))
+
+        try:
+            registry_https = TSARegistry()
+            https_calls = []
+            registry_https._fetch_http_json = lambda url, verify_tls: (
+                https_calls.append((url, verify_tls)) or {"advisories": []}
+            )
+            payload = registry_https._fetch_url("https://example.test/feed.json")
+            if payload == {"advisories": []} and https_calls == [
+                ("https://example.test/feed.json", True)
+            ]:
+                test_pass("Registry https fetch uses TLS verification")
+            else:
+                test_fail(
+                    "Registry https fetch uses TLS verification",
+                    f"Unexpected payload/calls: payload={payload}, calls={https_calls}",
+                )
+        except Exception as e:
+            test_fail("Registry https fetch uses TLS verification", str(e))
+    finally:
+        urllib.request.urlopen = original_urlopen
+
     advisory = {
         "id": "TSA-EDGE-1",
         "affected": [{"tool": {"name": "demo"}, "status": "AFFECTED"}],
@@ -3839,6 +4065,260 @@ def test_registry_action_handling():
     else:
         test_fail("Registry matches_condition commas", "Expected comma condition match")
 
+    # Deterministic BLOCK message selection should use stable advisory ordering.
+    registry_priority = TSARegistry()
+    registry_priority.advisories = {
+        "TSA-TEST-2025-9002": {
+            "id": "TSA-TEST-2025-9002",
+            "affected": [
+                {
+                    "tool": {"name": "demo", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "BLOCK", "message": "Block advisory 9002"}],
+        },
+        "TSA-TEST-2025-9001": {
+            "id": "TSA-TEST-2025-9001",
+            "affected": [
+                {
+                    "tool": {"name": "demo", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "BLOCK", "message": "Block advisory 9001"}],
+        },
+    }
+    registry_priority._package_index["demo@npm"] = [
+        "TSA-TEST-2025-9002",
+        "TSA-TEST-2025-9001",
+    ]
+    priority_result = registry_priority.check_package("demo", "1.1.0", "npm")
+    if priority_result.message == "Block advisory 9001":
+        test_pass("Registry deterministic BLOCK message ordering")
+    else:
+        test_fail(
+            "Registry deterministic BLOCK message ordering",
+            f"Expected advisory 9001 message, got: {priority_result.message}",
+        )
+
+    # Same advisory should not be duplicated in results when multiple affected entries match.
+    registry_dupe = TSARegistry()
+    registry_dupe.add_advisory(
+        {
+            "id": "TSA-TEST-2025-9100",
+            "affected": [
+                {
+                    "tool": {"name": "dup-demo", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                },
+                {
+                    "tool": {"name": "dup-demo", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                },
+            ],
+            "actions": [{"type": "WARN", "message": "Warn duplicate test"}],
+        }
+    )
+    dupe_result = registry_dupe.check_package("dup-demo", "1.2.0", "npm")
+    if len(dupe_result.advisories) == 1:
+        test_pass("Registry deduplicates advisories in results")
+    else:
+        test_fail(
+            "Registry deduplicates advisories in results",
+            f"Expected 1 advisory, got {len(dupe_result.advisories)}",
+        )
+
+    # Duplicate actions in one advisory should only be emitted once.
+    registry_action_dupe = TSARegistry()
+    registry_action_dupe.add_advisory(
+        {
+            "id": "TSA-TEST-2025-9200",
+            "affected": [
+                {
+                    "tool": {"name": "dup-action", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [
+                {"type": "WARN", "message": "Duplicate action"},
+                {"type": "WARN", "message": "Duplicate action"},
+            ],
+        }
+    )
+    dupe_action_result = registry_action_dupe.check_package("dup-action", "1.2.0", "npm")
+    if len(dupe_action_result.actions) == 1:
+        test_pass("Registry deduplicates duplicate actions")
+    else:
+        test_fail(
+            "Registry deduplicates duplicate actions",
+            f"Expected 1 action, got {len(dupe_action_result.actions)}",
+        )
+
+    # Check package should keep processing after unmatched advisories.
+    registry_unmatched = TSARegistry()
+    registry_unmatched.advisories = {
+        "A-UNMATCHED": {
+            "id": "A-UNMATCHED",
+            "affected": [
+                {
+                    "tool": {"name": "flow-demo", "registry": "npm"},
+                    "versions": {"introduced": "9.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "WARN", "message": "Should not match"}],
+        },
+        "B-MATCHED": {
+            "id": "B-MATCHED",
+            "affected": [
+                {
+                    "tool": {"name": "flow-demo", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "WARN", "message": "Matched warning"}],
+        },
+    }
+    registry_unmatched._package_index["flow-demo@npm"] = ["A-UNMATCHED", "B-MATCHED"]
+    unmatched_result = registry_unmatched.check_package("flow-demo", "1.2.0", "npm")
+    if "Matched warning" in unmatched_result.warnings:
+        test_pass("Registry continues after unmatched advisory")
+    else:
+        test_fail(
+            "Registry continues after unmatched advisory",
+            f"Warnings: {unmatched_result.warnings}",
+        )
+
+    # Duplicate ids in package index should still yield one advisory result.
+    registry_dup_idx = TSARegistry()
+    registry_dup_idx.advisories["TSA-DUPE-ID"] = {
+        "id": "TSA-DUPE-ID",
+        "affected": [
+            {
+                "tool": {"name": "dupe-idx", "registry": "npm"},
+                "versions": {"introduced": "1.0.0"},
+                "status": "AFFECTED",
+            }
+        ],
+        "actions": [{"type": "WARN", "message": "Dupe index warning"}],
+    }
+    registry_dup_idx._package_index["dupe-idx@npm"] = ["TSA-DUPE-ID", "TSA-DUPE-ID"]
+    dup_idx_result = registry_dup_idx.check_package("dupe-idx", "1.1.0", "npm")
+    if len(dup_idx_result.advisories) == 1:
+        test_pass("Registry deduplicates repeated advisory ids")
+    else:
+        test_fail(
+            "Registry deduplicates repeated advisory ids",
+            f"Expected 1 advisory, got {len(dup_idx_result.advisories)}",
+        )
+
+    # Mixed advisory id types in index should not crash sorting.
+    registry_mixed_ids = TSARegistry()
+    registry_mixed_ids.advisories = {
+        10: {
+            "id": 10,
+            "affected": [
+                {
+                    "tool": {"name": "mixed-id", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "WARN", "message": "Mixed id int"}],
+        },
+        "2": {
+            "id": "2",
+            "affected": [
+                {
+                    "tool": {"name": "mixed-id", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [{"type": "WARN", "message": "Mixed id str"}],
+        },
+    }
+    registry_mixed_ids._package_index["mixed-id@npm"] = [10, "2"]
+    try:
+        mixed_result = registry_mixed_ids.check_package("mixed-id", "1.1.0", "npm")
+        if len(mixed_result.advisories) == 2:
+            test_pass("Registry advisory sorting supports mixed ids")
+        else:
+            test_fail(
+                "Registry advisory sorting supports mixed ids",
+                f"Expected 2 advisories, got {len(mixed_result.advisories)}",
+            )
+    except Exception as e:
+        test_fail("Registry advisory sorting supports mixed ids", str(e))
+
+    # Action de-duplication should preserve different action types and keep processing.
+    registry_action_key = TSARegistry()
+    registry_action_key.add_advisory(
+        {
+            "id": "TSA-TEST-2025-9300",
+            "affected": [
+                {
+                    "tool": {"name": "action-key", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [
+                {"type": "WARN", "message": "Same message"},
+                {"type": "BLOCK", "message": "Same message"},
+                {"type": "WARN", "message": "Same message"},
+                {"type": "WARN", "message": "Tail warning"},
+            ],
+        }
+    )
+    action_key_result = registry_action_key.check_package("action-key", "1.1.0", "npm")
+    action_messages = [a.get("message") for a in action_key_result.actions]
+    if (
+        action_key_result.blocked
+        and action_messages == ["Same message", "Same message", "Tail warning"]
+        and "Tail warning" in action_key_result.warnings
+    ):
+        test_pass("Registry action key includes type and continues after duplicate")
+    else:
+        test_fail(
+            "Registry action key includes type and continues after duplicate",
+            f"Result: {action_key_result.to_dict()}",
+        )
+
+    # Action key fallback for missing type must not collide with explicit "XXXX" type.
+    registry_action_collision = TSARegistry()
+    registry_action_collision.add_advisory(
+        {
+            "id": "TSA-TEST-2025-9301",
+            "affected": [
+                {
+                    "tool": {"name": "action-collision", "registry": "npm"},
+                    "versions": {"introduced": "1.0.0"},
+                    "status": "AFFECTED",
+                }
+            ],
+            "actions": [
+                {"message": "Collision message"},
+                {"type": "XXXX", "message": "Collision message"},
+            ],
+        }
+    )
+    collision_result = registry_action_collision.check_package("action-collision", "1.1.0", "npm")
+    if len(collision_result.actions) == 2:
+        test_pass("Registry action key keeps missing type distinct from explicit XXXX")
+    else:
+        test_fail(
+            "Registry action key keeps missing type distinct from explicit XXXX",
+            f"Result: {collision_result.to_dict()}",
+        )
+
 
 def test_registry_sdk_edge_cases():
     """Exercise remaining registry SDK branches for coverage."""
@@ -4012,13 +4492,36 @@ def test_registry_sdk_edge_cases():
 
     original_urlopen = urllib.request.urlopen
     try:
-        urllib.request.urlopen = lambda *_args, **_kwargs: DummyResponse(
-            json.dumps({"advisories": []}).encode("utf-8")
-        )
+        captured_kwargs = []
+
+        def _capture_urlopen(*_args, **_kwargs):
+            captured_kwargs.append(_kwargs)
+            return DummyResponse(json.dumps({"advisories": []}).encode("utf-8"))
+
+        urllib.request.urlopen = _capture_urlopen
         if registry._fetch_url("https://example.test/feed.json") == {"advisories": []}:
             test_pass("registry fetch http")
         else:
             test_fail("registry fetch http", "Unexpected response")
+
+        https_kwargs = captured_kwargs[-1] if captured_kwargs else {}
+        if https_kwargs.get("timeout") == 30 and https_kwargs.get("context") is not None:
+            test_pass("registry fetch https timeout/context")
+        else:
+            test_fail("registry fetch https timeout/context", f"kwargs={https_kwargs}")
+
+        captured_kwargs.clear()
+        if registry._fetch_http_json("http://example.test/feed.json", verify_tls=False) == {
+            "advisories": []
+        }:
+            test_pass("registry fetch http timeout")
+        else:
+            test_fail("registry fetch http timeout", "Unexpected response")
+        http_kwargs = captured_kwargs[-1] if captured_kwargs else {}
+        if http_kwargs.get("timeout") == 30 and "context" not in http_kwargs:
+            test_pass("registry fetch http timeout kwarg")
+        else:
+            test_fail("registry fetch http timeout kwarg", f"kwargs={http_kwargs}")
     finally:
         urllib.request.urlopen = original_urlopen
 
@@ -4333,6 +4836,58 @@ def test_registry_core_direct_checks():
         test_pass("registry core resolve local")
     else:
         test_fail("registry core resolve local", "Unexpected local URL")
+
+    # Validate exact kwargs for the mutation-active core module path.
+    import urllib.request
+
+    class _CoreDummyResponse:
+        def __init__(self, data: bytes):
+            self._data = data
+
+        def read(self):
+            return self._data
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    original_urlopen = urllib.request.urlopen
+    try:
+        captured_kwargs = []
+
+        def _capture_urlopen(*_args, **_kwargs):
+            captured_kwargs.append(_kwargs)
+            return _CoreDummyResponse(json.dumps({"advisories": []}).encode("utf-8"))
+
+        urllib.request.urlopen = _capture_urlopen
+
+        https_payload = registry._fetch_http_json("https://example.test/feed.json", verify_tls=True)
+        https_kwargs = captured_kwargs[-1] if captured_kwargs else {}
+        if (
+            https_payload == {"advisories": []}
+            and https_kwargs.get("timeout") == 30
+            and https_kwargs.get("context") is not None
+        ):
+            test_pass("registry core fetch https timeout/context")
+        else:
+            test_fail("registry core fetch https timeout/context", f"kwargs={https_kwargs}")
+
+        captured_kwargs.clear()
+        http_payload = registry._fetch_http_json("http://example.test/feed.json", verify_tls=False)
+        http_kwargs = captured_kwargs[-1] if captured_kwargs else {}
+        if (
+            http_payload == {"advisories": []}
+            and "timeout" in http_kwargs
+            and http_kwargs.get("timeout") == 30
+            and "context" not in http_kwargs
+        ):
+            test_pass("registry core fetch http timeout exact")
+        else:
+            test_fail("registry core fetch http timeout exact", f"kwargs={http_kwargs}")
+    finally:
+        urllib.request.urlopen = original_urlopen
 
     registry_missing = core.TSARegistry()
     registry_missing.advisories["TSA-MISSING-AFFECTED"] = {"id": "TSA-MISSING-AFFECTED"}
@@ -4938,6 +5493,7 @@ def run_all(verbose: bool = False):
         test_tsactl_schema_error_ordering()
         test_tsactl_semantics_positive()
         test_tsactl_semantics_edge_cases()
+        test_tsactl_semantics_mixed_timezone_no_crash()
         test_tsactl_match_bounds()
         test_tsactl_missing_imports()
         test_tsactl_version_helpers()

@@ -5,7 +5,7 @@
   "modified": "2025-07-11T09:00:00Z",
   "publisher": {
     "name": "MCP Security Working Group",
-    "namespace": "https://tsa.mcp.security"
+    "namespace": "https://github.com/mcp-security"
   },
   "title": "MCP Filesystem Server Sandbox Escape via Path Traversal and Symlink Following",
   "description": "The @modelcontextprotocol/server-filesystem package before version 0.6.4 contains two related vulnerabilities that allow escaping the configured filesystem sandbox. CVE-2025-53109 is a path traversal vulnerability in the edit_file function allowing writes outside allowed directories. CVE-2025-53110 allows symlink-following to read files outside the sandbox. Together these enable full filesystem access regardless of configured restrictions.",
@@ -71,7 +71,7 @@
     },
     {
       "type": "FIX",
-      "url": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem/v/0.6.4",
+      "url": "https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem?activeTab=versions",
       "description": "Fixed version on npm"
     },
     {

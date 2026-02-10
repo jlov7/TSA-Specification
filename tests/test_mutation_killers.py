@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import os
 import tempfile
-import zlib
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -482,14 +482,14 @@ def test_build_feed_severity_and_cve_dedupe():
         advisory_dir = Path(tmpdir)
         doc = {
             "tsa_version": "1.0.0",
-            "id": "TSA-TEST-1000",
+            "id": "TSA-TEST-2025-1000",
             "title": "Test",
             "modified": "2025-01-02T00:00:00Z",
             "severity": {"qualitative": "HIGH"},
             "references": [{"type": "CVE", "id": "CVE-2025-0001"}],
             "related_vulnerabilities": [{"id": "CVE-2025-0001"}],
         }
-        path = advisory_dir / "TSA-TEST-1000.tsa.json"
+        path = advisory_dir / "TSA-TEST-2025-1000.tsa.json"
         path.write_text(json.dumps(doc))
 
         feed = build_feed_core.build_feed(advisory_dir, inline=False)
@@ -502,14 +502,14 @@ def test_build_feed_invalid_severity_and_missing_cve():
         advisory_dir = Path(tmpdir)
         doc = {
             "tsa_version": "1.0.0",
-            "id": "TSA-TEST-1001",
+            "id": "TSA-TEST-2025-1001",
             "title": "Test",
             "modified": "2025-01-03T00:00:00Z",
             "severity": {"qualitative": "UNKNOWN"},
             "references": [{"type": "WEB", "url": "https://example.test"}],
             "related_vulnerabilities": [{"id": "NOT-CVE"}],
         }
-        (advisory_dir / "TSA-TEST-1001.tsa.json").write_text(json.dumps(doc))
+        (advisory_dir / "TSA-TEST-2025-1001.tsa.json").write_text(json.dumps(doc))
         feed = build_feed_core.build_feed(advisory_dir, inline=False)
         entry = feed["advisories"][0]
         assert "severity" not in entry
@@ -1064,13 +1064,13 @@ def test_build_feed_inline_and_sorting_and_hash():
         advisory_dir = Path(tmpdir)
         older = {
             "tsa_version": "1.0.0",
-            "id": "TSA-OLD",
+            "id": "TSA-TEST-2025-1100",
             "title": "Old",
             "modified": "2025-01-01T00:00:00Z",
         }
         newer = {
             "tsa_version": "1.0.0",
-            "id": "TSA-NEW",
+            "id": "TSA-TEST-2025-1101",
             "title": "New",
             "modified": "2025-02-01T00:00:00Z",
         }
@@ -1078,9 +1078,9 @@ def test_build_feed_inline_and_sorting_and_hash():
         (advisory_dir / "new.tsa.json").write_text(json.dumps(newer))
 
         feed = build_feed_core.build_feed(advisory_dir, inline=True)
-        assert feed["advisories"][0]["id"] == "TSA-NEW"
+        assert feed["advisories"][0]["id"] == "TSA-TEST-2025-1101"
         assert "advisory" in feed["advisories"][0]
-        assert feed["advisories"][1]["id"] == "TSA-OLD"
+        assert feed["advisories"][1]["id"] == "TSA-TEST-2025-1100"
         assert feed["advisories"][0]["canonical_hash"] == tsactl_core.compute_canonical_hash(newer)
 
 
@@ -1089,7 +1089,7 @@ def test_build_feed_base_url_overwrites_uri():
         advisory_dir = Path(tmpdir)
         doc = {
             "tsa_version": "1.0.0",
-            "id": "TSA-BASE",
+            "id": "TSA-TEST-2025-1200",
             "title": "Base",
             "modified": "2025-01-01T00:00:00Z",
         }
@@ -1671,7 +1671,7 @@ def test_osv_to_tsa_missing_id_generates_from_published():
 def test_osv_to_tsa_missing_published_uses_current_year_and_timestamp():
     osv_doc = {"summary": "S"}
     tsa = osv_converter_core.osv_to_tsa(osv_doc)
-    current_year = datetime.utcnow().year
+    current_year = datetime.now(timezone.utc).year
     assert tsa["id"].startswith(f"TSA-TEST-{current_year}-")
     assert tsa["modified"].endswith("Z")
 
@@ -1706,15 +1706,15 @@ def test_mapping_case_variants_and_defaults():
 def test_generate_tsa_id_deterministic():
     osv_id = "OSV-TEST-1234"
     published = "2024-05-01T00:00:00Z"
-    digest = zlib.crc32(osv_id.encode("utf-8")) % 10000
-    expected = f"TSA-TEST-2024-{digest:04d}"
+    digest = int(hashlib.sha256(osv_id.encode("utf-8")).hexdigest()[:16], 16)
+    expected = f"TSA-TEST-2024-{digest % (10**12):012d}"
     assert osv_converter_core._generate_tsa_id(osv_id, published) == expected
 
 
 def test_build_feed_inline_base_url_precedence(tmp_path):
     doc = {
         "tsa_version": "1.0.0",
-        "id": "TSA-INLINE",
+        "id": "TSA-TEST-2025-1300",
         "title": "Inline",
         "modified": "2025-01-01T00:00:00Z",
     }
@@ -1722,7 +1722,7 @@ def test_build_feed_inline_base_url_precedence(tmp_path):
     path.write_text(json.dumps(doc))
     feed = build_feed_core.build_feed(tmp_path, base_url="https://example.test/base/", inline=True)
     assert feed["advisories"][0]["uri"] == "inline.tsa.json"
-    assert feed["advisories"][0]["advisory"]["id"] == "TSA-INLINE"
+    assert feed["advisories"][0]["advisory"]["id"] == "TSA-TEST-2025-1300"
 
 
 def test_load_advisory_reads_json(tmp_path):
@@ -1733,7 +1733,7 @@ def test_load_advisory_reads_json(tmp_path):
 
 
 def test_build_feed_handles_missing_modified(tmp_path):
-    doc = {"tsa_version": "1.0.0", "id": "TSA-NOMOD", "title": "NoMod"}
+    doc = {"tsa_version": "1.0.0", "id": "TSA-TEST-2025-1400", "title": "NoMod"}
     path = tmp_path / "nomod.tsa.json"
     path.write_text(json.dumps(doc))
     feed = build_feed_core.build_feed(tmp_path, inline=False)
@@ -1909,7 +1909,7 @@ def test_registry_init_defaults_and_nested_cache_dir(tmp_path):
 
 
 def test_registry_fetch_url_http_headers_http(monkeypatch):
-    registry = registry_core.TSARegistry()
+    registry = registry_core.TSARegistry(allow_insecure_http=True)
     seen = {}
 
     def fake_urlopen(req, context=None, timeout=None):
@@ -2190,7 +2190,7 @@ def test_registry_to_ecosystem_uppercase_normalizes():
 def test_osv_to_tsa_missing_id_uses_zero_serial_and_unknown_message():
     osv_doc = {"published": "2025-01-01T00:00:00Z"}
     tsa = osv_converter_core.osv_to_tsa(osv_doc)
-    assert tsa["id"] == "TSA-TEST-2025-0000"
+    assert tsa["id"] == "TSA-TEST-2025-000000000000"
     assert tsa["title"] == "Imported from OSV"
     assert tsa["actions"][0]["message"].endswith("unknown")
 
@@ -2321,7 +2321,7 @@ def test_build_feed_severity_levels(tmp_path):
     for idx, severity in enumerate(severities, start=1):
         doc = {
             "tsa_version": "1.0.0",
-            "id": f"TSA-SEV-{severity}",
+            "id": f"TSA-TEST-2025-15{idx:02d}",
             "title": "Severity test",
             "modified": f"2025-01-0{idx}T00:00:00Z",
             "severity": {"qualitative": severity},
@@ -2329,15 +2329,15 @@ def test_build_feed_severity_levels(tmp_path):
         (tmp_path / f"{severity.lower()}.tsa.json").write_text(json.dumps(doc))
     feed = build_feed_core.build_feed(tmp_path, inline=False)
     by_id = {entry["id"]: entry for entry in feed["advisories"]}
-    for severity in severities:
-        entry = by_id[f"TSA-SEV-{severity}"]
+    for idx, severity in enumerate(severities, start=1):
+        entry = by_id[f"TSA-TEST-2025-15{idx:02d}"]
         assert entry["severity"] == severity
 
 
 def test_build_feed_related_vulnerabilities_cve(tmp_path):
     doc = {
         "tsa_version": "1.0.0",
-        "id": "TSA-REL-1",
+        "id": "TSA-TEST-2025-1600",
         "title": "Rel",
         "modified": "2025-01-01T00:00:00Z",
         "related_vulnerabilities": [{"id": "CVE-2025-1234"}, {"id": "NOT-CVE"}],
@@ -2352,7 +2352,7 @@ def test_build_feed_related_vulnerabilities_cve(tmp_path):
 def test_build_feed_base_url_trailing_slash(tmp_path):
     doc = {
         "tsa_version": "1.0.0",
-        "id": "TSA-TRAIL",
+        "id": "TSA-TEST-2025-1700",
         "title": "Trail",
         "modified": "2025-01-01T00:00:00Z",
     }

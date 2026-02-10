@@ -5,7 +5,7 @@
   "modified": "2025-07-10T12:00:00Z",
   "publisher": {
     "name": "MCP Security Working Group",
-    "namespace": "https://tsa.mcp.security"
+    "namespace": "https://github.com/mcp-security"
   },
   "title": "MCP Inspector Remote Code Execution via 0.0.0.0 Binding",
   "description": "The @modelcontextprotocol/inspector package before version 0.14.1 binds its development server to 0.0.0.0 by default, exposing it to all network interfaces. This allows attackers on the local network (or via DNS rebinding) to achieve remote code execution through the inspector's debugging capabilities. This is a '0.0.0.0 day' class vulnerability that affects development tools binding to all interfaces. Discovered by Avi Lumelsky of Oligo Security.",
@@ -55,13 +55,8 @@
       "url": "https://github.com/advisories/GHSA-7f8r-222p-6f5g"
     },
     {
-      "type": "REPORT",
-      "url": "https://www.oligo.security/blog/0-0-0-0-day-exploiting-localhost-apis",
-      "description": "Oligo Security research on 0.0.0.0 day vulnerabilities"
-    },
-    {
       "type": "FIX",
-      "url": "https://www.npmjs.com/package/@modelcontextprotocol/inspector/v/0.14.1",
+      "url": "https://www.npmjs.com/package/@modelcontextprotocol/inspector?activeTab=versions",
       "description": "Fixed version on npm"
     }
   ],

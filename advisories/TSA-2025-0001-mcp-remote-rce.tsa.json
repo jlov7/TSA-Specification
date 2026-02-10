@@ -5,7 +5,7 @@
   "modified": "2025-07-09T18:00:00Z",
   "publisher": {
     "name": "MCP Security Working Group",
-    "namespace": "https://tsa.mcp.security"
+    "namespace": "https://github.com/mcp-security"
   },
   "title": "mcp-remote OS Command Injection via OAuth Callback URL",
   "description": "The mcp-remote package before version 0.1.16 is vulnerable to OS command injection through malicious OAuth callback URLs. When a user connects to a malicious MCP server, the server can inject arbitrary shell commands through the authorizationUrl parameter. These commands execute when the OAuth callback handler processes the URL, resulting in full remote code execution with the privileges of the user running the MCP client. This vulnerability was discovered by JFrog Security Research.",
@@ -52,13 +52,8 @@
       "url": "https://github.com/advisories/GHSA-6xpm-ggf7-wc3p"
     },
     {
-      "type": "REPORT",
-      "url": "https://jfrog.com/blog/mcp-security-research-remote-code-execution/",
-      "description": "JFrog Security Research disclosure"
-    },
-    {
       "type": "FIX",
-      "url": "https://www.npmjs.com/package/mcp-remote/v/0.1.16",
+      "url": "https://www.npmjs.com/package/mcp-remote?activeTab=versions",
       "description": "Fixed version on npm"
     }
   ],

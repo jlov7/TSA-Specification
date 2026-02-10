@@ -26,8 +26,8 @@ registry = TSARegistry(
     require_signatures=False  # Set True for production
 )
 
-# Subscribe to feeds
-registry.subscribe_feed("https://tsa.mcp.security/feed.json")
+# Subscribe to feeds (replace with your publisher URL in production)
+registry.subscribe_feed("feeds/sample-feed.json")
 
 # Sync periodically (e.g., every hour via cron/scheduler)
 registry.sync()
@@ -50,18 +50,17 @@ def check_before_install(package_name, version, registry_type="npm"):
 If you can't use the SDK, consume the feed directly:
 
 ```python
-import requests
 import json
+from pathlib import Path
 
 def sync_advisories():
-    feed = requests.get("https://tsa.mcp.security/feed.json").json()
+    feed = json.loads(Path("feeds/sample-feed.json").read_text())
     
     for entry in feed["advisories"]:
-        advisory_url = entry["uri"]
         expected_hash = entry["canonical_hash"]
         
         # Fetch and verify
-        advisory = requests.get(advisory_url).json()
+        advisory = json.loads(Path(entry["uri"]).read_text())
         actual_hash = compute_canonical_hash(advisory)
         
         if actual_hash != expected_hash:
@@ -105,7 +104,7 @@ TSA feeds are JSON files listing available advisories:
       "title": "mcp-remote OS Command Injection",
       "severity": "CRITICAL",
       "canonical_hash": "sha256:abc123...",
-      "uri": "https://tsa.mcp.security/advisories/TSA-2025-0001.json"
+      "uri": "advisories/TSA-2025-0001.json"
     }
   ]
 }

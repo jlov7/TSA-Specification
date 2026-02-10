@@ -15,6 +15,7 @@ License: Apache-2.0
 
 import hashlib
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -69,6 +70,9 @@ except ImportError:
             return "sha256:" + hashlib.sha256(canonicalize(d).encode("utf-8")).hexdigest()
 
 
+_TSA_ID_RE = re.compile(r"^TSA-(TEST-)?[0-9]{4}-[0-9]{4,}$")
+
+
 def load_advisory(path: Path) -> Dict:
     """Load an advisory from a JSON file."""
     with open(path, "r") as f:  # pragma: no mutate
@@ -93,10 +97,17 @@ def build_feed(advisory_dir: Path, base_url: str = None, inline: bool = False) -
     for path in sorted(advisory_dir.glob("*.tsa.json")):
         try:
             advisory = load_advisory(path)
+            advisory_id = advisory.get("id")
+            if not isinstance(advisory_id, str) or not _TSA_ID_RE.match(advisory_id):
+                print(
+                    f"Warning: Skipping {path} due to missing or invalid advisory id",
+                    file=sys.stderr,
+                )
+                continue
             canonical_hash = compute_canonical_hash(advisory)
 
             entry = {
-                "id": advisory.get("id"),
+                "id": advisory_id,
                 "uri": path.name,  # Will be overwritten below if base_url provided
                 "canonical_hash": canonical_hash,
                 "title": advisory.get("title"),
